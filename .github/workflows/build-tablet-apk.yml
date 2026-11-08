@@ -55,6 +55,28 @@ jobs:
         working-directory: web
         run: npx cap sync android
 
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/wrapper
+            ~/.gradle/caches
+          key: gradle-${{ hashFiles('web/android/gradle/wrapper/gradle-wrapper.properties', 'web/android/**/*.gradle') }}
+          restore-keys: gradle-
+
+      # The Gradle download is redirected to GitHub release storage, which has been
+      # returning 504s: use the smaller -bin distribution, a longer timeout, and retries.
+      - name: Download Gradle (with retries)
+        working-directory: web/android
+        run: |
+          sed -i 's/-all\.zip/-bin.zip/; s/^networkTimeout=.*/networkTimeout=120000/' gradle/wrapper/gradle-wrapper.properties
+          for i in 1 2 3 4 5; do
+            ./gradlew --version --no-daemon && exit 0
+            echo "Gradle download failed (attempt $i), retrying in 30s..."
+            sleep 30
+          done
+          exit 1
+
       - name: Build debug APK
         working-directory: web/android
         run: ./gradlew assembleDebug --no-daemon -PappVersionName="tablet-${{ steps.ver.outputs.short_sha }}"
