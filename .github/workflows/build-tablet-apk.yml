@@ -38,16 +38,14 @@ jobs:
           distribution: temurin
           java-version: 21
 
-       - name: Install web dependencies
-         working-directory: web
-         run: |
-           for i in 1 2; do
-             npm ci && exit 0
-             echo "npm ci failed (attempt $i), retrying in 20s..."
-             sleep 20
-           done
-           echo "Last attempt: skipping install scripts (sharp is only used for icon generation)"
-           npm ci --ignore-scripts
+      # sharp (used only by @capacitor/assets for icon generation) downloads libvips
+      # at install time and keeps timing out, so install scripts are skipped and only
+      # esbuild's script is run afterwards.
+      - name: Install web dependencies
+        working-directory: web
+        run: |
+          npm ci --ignore-scripts
+          npm rebuild esbuild
 
       - name: Build app web bundle
         working-directory: web
