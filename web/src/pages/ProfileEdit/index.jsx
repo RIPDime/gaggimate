@@ -41,6 +41,7 @@ export function ProfileEdit() {
   const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savedNotice, setSavedNotice] = useState(false);
   const { params } = useRoute();
   const [data, setData] = useState(null);
   useEffect(() => {
@@ -122,7 +123,14 @@ export function ProfileEdit() {
           return;
         }
         setData(response.profile);
-        location.route('/profiles');
+        // Stay on the edit page after saving (tweak-and-save workflow on the machine tablet).
+        // A brand-new profile gets its id from the machine, so switch to that profile's URL;
+        // otherwise every further Save would create another copy.
+        if (params.id === 'new' && response.profile?.id) {
+          location.route(`/profiles/${response.profile.id}`, true);
+        }
+        setSavedNotice(true);
+        setTimeout(() => setSavedNotice(false), 2000);
       } catch (e) {
         window.alert(`Saving the profile failed: ${e?.message || e}`);
       } finally {
@@ -165,6 +173,14 @@ export function ProfileEdit() {
           </button>
         )}
       </div>
+
+      {savedNotice && (
+        <div className='toast toast-center toast-bottom z-50'>
+          <div className='alert alert-success'>
+            <span>Profile saved</span>
+          </div>
+        </div>
+      )}
 
       {!data?.type && <ProfileTypeSelection onSelect={type => setData({ ...data, type })} />}
       {data?.type === 'standard' && (
