@@ -113,10 +113,21 @@ export function ProfileEdit() {
     async data => {
       setSaving(true);
       console.log(data);
-      const response = await apiService.request({ tp: 'req:profiles:save', profile: data });
-      setData(response.profile);
-      setSaving(false);
-      location.route('/profiles');
+      // Without try/finally a failed or timed-out save left the Save button spinning forever.
+      // Show why it failed (timeout / not connected / machine error) and re-enable the button.
+      try {
+        const response = await apiService.request({ tp: 'req:profiles:save', profile: data });
+        if (response.error) {
+          window.alert(`Saving the profile failed: ${response.error}`);
+          return;
+        }
+        setData(response.profile);
+        location.route('/profiles');
+      } catch (e) {
+        window.alert(`Saving the profile failed: ${e?.message || e}`);
+      } finally {
+        setSaving(false);
+      }
     },
     [apiService, params.id, location],
   );
