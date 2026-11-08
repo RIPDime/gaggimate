@@ -146,8 +146,25 @@ export default class ApiService {
     }
   }
 
+  // Resolves true once the socket is open, false after timeoutMs.
+  waitForOpen(timeoutMs = 8000) {
+    const isOpen = () => this.socket && this.socket.readyState === WebSocket.OPEN;
+    if (isOpen()) return Promise.resolve(true);
+    return new Promise(resolve => {
+      const started = Date.now();
+      const timer = setInterval(() => {
+        if (isOpen() || Date.now() - started >= timeoutMs) {
+          clearInterval(timer);
+          resolve(isOpen());
+        }
+      }, 100);
+    });
+  }
+
   async request(data = {}) {
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+    // The app drops the socket while a system screen (file picker, share sheet) covers it,
+    // so give a reconnect in progress a moment instead of failing right away.
+    if (!(await this.waitForOpen())) {
       throw new Error('WebSocket is not connected');
     }
 

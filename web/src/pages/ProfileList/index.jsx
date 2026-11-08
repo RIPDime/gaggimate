@@ -941,7 +941,7 @@ export function ProfileList() {
     const reader = new FileReader();
     reader.onerror = () => {
       input.value = '';
-      window.alert(t`Could not read the selected file.`);
+      window.alert('Could not read the selected file.');
     };
     reader.onload = async e => {
       // Reset so picking the same file again still fires onChange.
@@ -950,7 +950,7 @@ export function ProfileList() {
       if (typeof result !== 'string') return;
       const profiles = parseProfile(result);
       if (!profiles.length) {
-        window.alert(t`No profiles found in ${file.name}. Is it a GaggiMate JSON or TCL profile?`);
+        window.alert(`No profiles found in ${file.name}. Is it a GaggiMate JSON or TCL profile?`);
         return;
       }
       setLoading(true);
@@ -971,7 +971,7 @@ export function ProfileList() {
       }
       await invalidateProfiles();
       if (errors.length) {
-        window.alert(t`Imported ${saved} of ${profiles.length} profiles.` + '\n' + errors.join('\n'));
+        window.alert(`Imported ${saved} of ${profiles.length} profiles.\n${errors.join('\n')}`);
       }
     };
     reader.readAsText(file);
