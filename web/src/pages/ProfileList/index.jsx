@@ -26,6 +26,7 @@ import { Spinner } from '../../components/Spinner.jsx';
 import Card from '../../components/Card.jsx';
 import { parseProfile } from './utils.js';
 import { downloadJson } from '../../utils/download.js';
+import { isApp } from '../../app/platform.js';
 import { exportProfileImage, importProfileImage } from '../../utils/profileImage.js';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faStar } from '@fortawesome/free-solid-svg-icons/faStar';
@@ -931,31 +932,49 @@ export function ProfileList() {
     downloadJson(exportedProfiles, 'profiles.json');
   }, [profiles]);
 
+  // In the app, Android's picker turns `accept` into a MIME filter that can grey out
+  // downloaded .json files, so the app skips the filter (see the input below).
   const onUpload = function (evt) {
-    if (evt.target.files.length) {
-      const file = evt.target.files[0];
-      const reader = new FileReader();
-      reader.onload = async e => {
-        const result = e.target.result;
-        if (typeof result === 'string') {
-          setLoading(true);
-          try {
-            const profiles = parseProfile(result);
-            for (const { image, ...p } of profiles) {
-              const response = await apiService.request({ tp: 'req:profiles:save', profile: p });
-              const id = response?.profile?.id;
-              if (image && id && machine.value.capabilities.sdCard) {
-                await importProfileImage(id, image).catch(() => {});
-              }
-            }
-          } catch {
-            // Individual save errors are surfaced by WS timeout; continue to reload list.
+    const input = evt.target;
+    if (!input.files || !input.files.length) return;
+    const file = input.files[0];
+    const reader = new FileReader();
+    reader.onerror = () => {
+      input.value = '';
+      window.alert(t`Could not read the selected file.`);
+    };
+    reader.onload = async e => {
+      // Reset so picking the same file again still fires onChange.
+      input.value = '';
+      const result = e.target.result;
+      if (typeof result !== 'string') return;
+      const profiles = parseProfile(result);
+      if (!profiles.length) {
+        window.alert(t`No profiles found in ${file.name}. Is it a GaggiMate JSON or TCL profile?`);
+        return;
+      }
+      setLoading(true);
+      let saved = 0;
+      const errors = [];
+      for (const { image, ...p } of profiles) {
+        try {
+          const response = await apiService.request({ tp: 'req:profiles:save', profile: p });
+          if (response?.error) throw new Error(response.error);
+          saved++;
+          const id = response?.profile?.id;
+          if (image && id && machine.value.capabilities?.sdCard) {
+            await importProfileImage(id, image).catch(() => {});
           }
-          await invalidateProfiles();
+        } catch (err) {
+          errors.push(`${p?.label || '?'}: ${err?.message || err}`);
         }
-      };
-      reader.readAsText(file);
-    }
+      }
+      await invalidateProfiles();
+      if (errors.length) {
+        window.alert(t`Imported ${saved} of ${profiles.length} profiles.` + '\n' + errors.join('\n'));
+      }
+    };
+    reader.readAsText(file);
   };
 
   const onClear = useCallback(async () => {
@@ -1031,7 +1050,7 @@ export function ProfileList() {
             className='hidden'
             id='profileImport'
             type='file'
-            accept='.json,application/json,.tcl'
+            accept={isApp ? undefined : '.json,application/json,.tcl'}
             aria-label={t`Select a JSON file containing profile data to import`}
           />
           <ConfirmButton
